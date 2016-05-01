@@ -45,6 +45,7 @@ STATES_MAP = {NOSTATE: (),
 
 
 class QEMUContextFactory(object):
+    """Builds a SeeContext object based on QEMUResources."""
     def __init__(self, configuration):
         self.configuration = load_configuration(configuration)
 
@@ -52,10 +53,12 @@ class QEMUContextFactory(object):
         from see.context.resources.qemu import QEMUResources
 
         resources = QEMUResources(identifier, self.configuration)
+
         return SeeContext(identifier, resources)
 
 
 class LXCContextFactory(object):
+    """Builds a SeeContext object based on LXCResources."""
     def __init__(self, configuration):
         self.configuration = load_configuration(configuration)
 
@@ -63,10 +66,12 @@ class LXCContextFactory(object):
         from see.context.resources.lxc import LXCResources
 
         resources = LXCResources(identifier, self.configuration)
+
         return SeeContext(identifier, resources)
 
 
 class VBoxContextFactory(object):
+    """Builds a SeeContext object based on VBoxResources."""
     def __init__(self, configuration):
         self.configuration = load_configuration(configuration)
 
@@ -74,6 +79,7 @@ class VBoxContextFactory(object):
         from see.context.resources.vbox import VBoxResources
 
         resources = VBoxResources(identifier, self.configuration)
+
         return SeeContext(identifier, resources)
 
 
@@ -91,8 +97,6 @@ class SeeContext(Context):
     the installed plugins.
 
     """
-    arp_table_path = '/proc/net/arp'
-
     def __init__(self, identifier, resources):
         super(SeeContext, self).__init__(identifier)
         self._resources = resources
@@ -156,16 +160,19 @@ class SeeContext(Context):
 
     @property
     def ip4_address(self):
-        if self._ip4_address is None:
+        if self._ip4_address is None and self.network is not None:
             self._ip4_address = self._get_ip_address()
 
         return self._ip4_address
 
     def _get_ip_address(self):
-        with open(self.arp_table_path) as arp_file:
-            arp_table = arp_file.read()
+        mac = self.mac_address
 
-        return arp_table_lookup(self.mac_address, arp_table)
+        for lease in self.network.DHCPLeases():
+            if mac == lease.get('mac'):
+                return lease.get('ipaddr', None)
+
+        return None
 
     def poweron(self, **kwargs):
         """
